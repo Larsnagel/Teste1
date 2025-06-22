@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Dissonance Character Creator</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and ReactDOM libraries from CDN -->
+    <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+    <!-- Google Fonts for Inter -->
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Fade-in animation for steps */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-900">
+    <div id="root"></div>
+
+    <script>
+        // Use shorter aliases for convenience
+        const e = React.createElement;
+        const { useState, useEffect, useCallback } = React;
+
+        // --- DATA ---
+        // This section contains all the game data from the rulebook. It remains the same.
+        const ARCHETYPES = {
+            Brains: {
+                description: "A brilliant Academic or a cunning Weaver who handles technical and intellectual challenges.",
+                attributeSuggestions: {
+                    "The Specialist": { COG: 2, DEX: 1, PRE: 1, SOM: 0 },
+                    "The Field Analyst": { COG: 2, SOM: 1, DEX: 1, PRE: 0 },
+                    "The Balanced Genius": { COG: 1, DEX: 1, PRE: 1, SOM: 1 },
+                },
+                careerSuggestions: {
+                    "The Infiltration Specialist": { Weaver: 2, Scout: 1, Doctor: 1, Shadow: 0 },
+                    "The Corporate Analyst": { Weaver: 2, Academic: 1, Corpo: 1, Fixer: 0 },
+                    "The Versatile Technician": { Weaver: 1, Torque: 1, Scout: 1, Doctor: 1 },
+                }
+            },
+            Muscle: {
+                description: "A hardened Soldier or tough-as-nails Colonist who excels at combat and intimidation.",
+                attributeSuggestions: {
+                    "The Juggernaut": { SOM: 2, DEX: 1, COG: 1, PRE: 0 },
+                    "The Intimidating Brawler": { SOM: 2, PRE: 1, DEX: 1, COG: 0 },
+                    "The Agile Warrior": { SOM: 1, DEX: 2, COG: 1, PRE: 0 },
+                },
+                careerSuggestions: {
+                    "The Colonial Militiaman": { Soldier: 2, Colonist: 2, Torque: 0, Marshal: 0 },
+                    "The Underworld Enforcer": { "Bounty Hunter": 2, Outlaw: 1, Fixer: 1, Shadow: 0 },
+                    "The Ex-Corpo Security": { Soldier: 2, Corpo: 1, Pilot: 1, Scout: 0 },
+                }
+            },
+            Ghost: {
+                description: "A stealthy Shadow or a resourceful Scavenger who specializes in infiltration.",
+                attributeSuggestions: {
+                    "The Specialist": { DEX: 2, COG: 2, SOM: 0, PRE: 0 },
+                    "The Hardened Survivor": { DEX: 2, SOM: 1, COG: 1, PRE: 0 },
+                    "The Urban Phantom": { DEX: 2, PRE: 1, COG: 1, SOM: 0 },
+                },
+                careerSuggestions: {
+                    "The Professional Thief": { Shadow: 2, Scout: 1, Fixer: 1, Weaver: 0 },
+                    "The Social Engineer": { Dilettante: 2, Shadow: 1, Corpo: 1, Fixer: 0 },
+                    "The Rooftop Runner": { Scavenger: 2, Shadow: 1, Torque: 1, Pilot: 0 },
+                }
+            },
+            Face: {
+                description: "A charismatic Fixer or a well-connected Dilettante who navigates the social landscape.",
+                attributeSuggestions: {
+                    "The Pure Socialite": { PRE: 2, COG: 1, DEX: 1, SOM: 0 },
+                    "The Confident Operator": { PRE: 2, SOM: 1, COG: 1, DEX: 0 },
+                    "The Fast-Talker": { PRE: 2, DEX: 2, COG: 0, SOM: 0 },
+                },
+                careerSuggestions: {
+                    "The Information Broker": { Fixer: 2, Outlaw: 1, Shadow: 1, Corpo: 0 },
+                    "The Corporate Shark": { Corpo: 2, Dilettante: 1, Fixer: 1, Pilot: 0 },
+                    "The Smuggler Captain": { Pilot: 2, Outlaw: 1, Fixer: 1, Torque: 0 },
+                }
+            },
+            Zealot: {
+                description: "A scholar or visionary with a dangerous obsession, offering strange insights but representing a walking narrative complication.",
+                attributeSuggestions: {
+                    "The Scholar": { COG: 2, PRE: 1, DEX: 1, SOM: 0 },
+                    "The Prophet": { PRE: 2, COG: 2, DEX: 0, SOM: 0 },
+                    "The Field Researcher": { COG: 1, PRE: 1, DEX: 1, SOM: 1 },
+                },
+                careerSuggestions: {
+                    "The Ghost Hunter": { Academic: 2, Weaver: 1, Doctor: 1, Fixer: 0 },
+                    "The Corporate Heretic": { Academic: 2, Corpo: 1, Shadow: 1, Outlaw: 0 },
+                    "The Fragmentation Purist": { Weaver: 2, Academic: 1, Doctor: 1, Marshal: 0 },
+                }
+            }
+        };
+
+        const COMBAT_SUGGESTIONS = {
+            Brains: { "Cautious Operator": { DF: 2, IN: 2, RG: 0, ML: 0 }, "Prepared Survivor": { DF: 1, IN: 1, RG: 1, ML: 1 }, "Overwatch Specialist": { RG: 2, DF: 1, IN: 1, ML: 0 }, },
+            Muscle: { "Shock Trooper": { ML: 2, RG: 1, IN: 1, DF: 0 }, "Bodyguard": { DF: 2, RG: 1, IN: 1, ML: 0 }, "Grunt Veteran": { RG: 1, ML: 1, DF: 1, IN: 1 }, },
+            Ghost: { "The Untouchable": { DF: 2, IN: 2, RG: 0, ML: 0 }, "The Assassin": { RG: 2, IN: 2, DF: 0, ML: 0 }, "The Pragmatist": { DF: 1, IN: 1, RG: 1, ML: 1 }, },
+            Face: { "Ace Pilot": { DF: 2, IN: 2, RG: 0, ML: 0 }, "Captain's Authority": { RG: 2, IN: 1, DF: 1, ML: 0 }, "Slippery Smuggler": { IN: 2, DF: 1, RG: 1, ML: 0 }, },
+            Zealot: { "Field Researcher": { DF: 2, IN: 2, RG: 0, ML: 0 }, "Pragmatic Scholar": { DF: 1, IN: 1, RG: 1, ML: 1 }, "Self-Taught Marksman": { RG: 2, DF: 1, IN: 1, ML: 0 }, }
+        };
+
+        const POSITIVE_TAGS = { "Meticulous": "Once per scene, when using a Ready Action to prepare, gain +2 FP on the next related roll.", "Precision-Tuned Myofibers": "Once per scene, gain +2 FP on a Dexterity roll requiring fine control.", "Overclocked Reflexes": "Once per scene, gain +2 FP when making a Reflex Save or rolling Initiative.", "Servo Strength": "Once per scene, gain +2 FP on a feat of brute strength or a power-based melee attack.", "Bone Reinforcement": "Gain DR 1 vs. Blunt/Knockdown. Once per scene, gain +2 FP after taking kinetic damage.", "Bad Temper": "Once per scene, gain +2 FP when resisting Manipulation or Persuasion.", "Protective": "Once per round, make a Reflex Save (TN 9) to intercept a hit on an ally. Adjacent allies gain +1 Defence.", "Predator Gait Calibration": "Once per scene, gain +2 FP on Stealth or Pursuit actions.", "Pheromone Cloak": "Once per scene, gain +2 FP to reduce suspicion or enhance charm.", "Owl’s Vision": "Once per scene, gain +2 FP when acting in darkness, targeting distant enemies, or spotting details.", "Sangfroid": "Once per scene, negate the first SP gain during an action sequence.", "Carouser": "Once per scene, gain +2 FP when gathering info, making contacts, or bartering.", "Stoic": "Once per scene, roll Will instead of Endurance. If successful, gain +2 FP.", "Neural Crossfire Hub": "Once per scene, gain +2 FP when splitting focus between two tasks." };
+
+        const NEGATIVE_TAGS = { "Bad Filters": "Once per scene, GM can describe sensory interference. Gain +1 SP.", "Rebel": "When asked to follow direct orders, roll Will. On failure, act against the command and gain +1 SP.", "Paranoia": "After failing a Perception roll, gain +1 SP as your mind spirals.", "Callous": "Gain +1 SP on social rolls with past victims.", "Edited Memories": "Once per session, GM can describe a memory misfire. Gain +1 SP.", "Haunted": "Your Muse is a Ghost. Once per scene, the GM may trigger it to interfere disturbingly, giving you +1 SP.", "Unplugged": "You lack Mesh integration. Once per session, this causes a narrative complication and +1 SP.", "Ex-Drone": "You were part of a hive mind. When faced with total freedom or isolation, gain +1 SP.", "Selfless": "When you fail to act selflessly when the opportunity arises, gain +1 SP.", "Social Anxiety": "Once per scene in a high-pressure social setting, gain +1 SP." };
+
+        const OBLIGATIONS = { "Debt": "You owe someone. Big time. It's not always about credits.", "Betrayal": "You were betrayed by someone you trusted, or you're the one who did the betraying.", "Responsibility": "You feel a profound sense of accountability to a specific person, place, or thing.", "Blackmail": "Someone knows your dirty little secret and they're pulling your strings.", "Dutybound": "You're bound by a deep sense of duty you feel compelled to fulfill.", "Obsession": "There's something you just can't let go of, an unhealthy fixation that derails your life.", "Addiction": "A craving you must feed, be it for stims, booze, or the thrill of the job itself.", "Family": "Your kin require a significant amount of your time, attention, and resources.", "Criminal": "You've got a rap sheet that follows you, or you're tangled in a legal nightmare for a crime you may not have committed.", "Bounty": "There's a price on your head, legal or otherwise. Sleep light." };
+        
+        const BACKGROUND_TEMPLATES = { Brains: (c) => `A certified genius running from the consequences of their ambition, ${c.name} treats the universe as a problem to be solved. Their biggest problem? The debt they incurred for the chrome that makes them so smart.`, Muscle: (c) => `Once a loyal corporate enforcer for the Hegemony, ${c.name} now sells their skills to the highest bidder. They fight to protect their crew, the only family they have left after their old one was burned and discarded.`, Ghost: (c) => `${c.name} is a whisper, a phantom who slides through the cracks in the system. They erased their own past to survive a job gone bad, but someone holds the keys to their old life, blackmailing them into service.`, Face: (c) => `As captain of 'The Vagrant,' ${c.name} is the unflappable eye of the hurricane. They have to be. Juggling a demanding family, a decaying ship, and a crew of volatile specialists requires a steady hand and an even steadier nerve.`, Zealot: (c) => `${c.name} isn't in it for the money. A former corporate academic, they touched something in the Mesh—something they call 'The Chorus'—and it shattered their reality. Now they hunt Ghosts and Fragments, convinced they are sacred texts in a divine, digital language.` };
+
+        const NAMES = { Brains: ["Aksel", "Soren", "Jian", "Ren"], Muscle: ["Zane", "Grendel", "Vex", "Rook"], Ghost: ["Nyx", "Silas", "Echo", "Vanish"], Face: ["Silas", "Rian", "Cora", "Jax"], Zealot: ["Elias", "Thorn", "Cassian", "Orin"] };
+
+        // --- HELPER COMPONENTS (using React.createElement) ---
+
+        const OptionCard = ({ title, description, onSelect, isSelected }) => e(
+            'div',
+            {
+                className: `p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${isSelected ? 'bg-cyan-400 border-cyan-300 text-slate-900 shadow-lg scale-105' : 'bg-slate-800 border-slate-700 hover:border-cyan-500 hover:bg-slate-700'}`,
+                onClick: onSelect,
+            },
+            e('h3', { className: 'text-xl font-bold mb-2 text-white' }, title),
+            e('p', { className: 'text-sm opacity-80' }, description)
+        );
+
+        const StepContainer = ({ title, children }) => e(
+            'div',
+            { className: 'w-full max-w-4xl mx-auto p-4 md:p-8 animate-fadeIn' },
+            e('h2', { className: 'text-3xl md:text-4xl font-bold text-cyan-300 mb-2 tracking-wider uppercase' }, title),
+            e('div', { className: 'w-16 h-1 bg-cyan-300 mb-8' }),
+            children
+        );
+        
+        // --- STEP COMPONENTS ---
+        
+        const ArchetypeStep = ({ onSelect, nextStep, character }) => {
+            const handleNext = () => { if (character.archetype) nextStep(); };
+            return e(StepContainer, { title: "Step 1: Choose Your Archetype" },
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8' },
+                    Object.entries(ARCHETYPES).map(([name, data]) => e(OptionCard, {
+                        key: name,
+                        title: name,
+                        description: data.description,
+                        isSelected: character.archetype === name,
+                        onSelect: () => onSelect('archetype', name)
+                    }))
+                ),
+                e('div', { className: 'text-center' },
+                    e('button', { onClick: handleNext, disabled: !character.archetype, className: 'px-8 py-3 bg-cyan-500 text-slate-900 font-bold rounded-md hover:bg-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed' }, 'Confirm Archetype')
+                )
+            );
+        };
+
+        const AttributeStep = ({ onSelect, nextStep, character }) => {
+            const suggestions = ARCHETYPES[character.archetype].attributeSuggestions;
+            const handleNext = () => {
+                if (Object.values(character.attributes).reduce((a, b) => a + b, 0) === 4) {
+                    nextStep();
+                } else {
+                    alert("You must spend exactly 4 points.");
+                }
+            };
+            return e(StepContainer, { title: "Step 2: Distribute Attributes" },
+                e('p', { className: 'mb-6 text-slate-300' }, `Allocate 4 points into your four core attributes. No attribute can be higher than +2. Below are some suggestions for your chosen archetype: `, e('span', {className: 'font-bold text-cyan-400'}, character.archetype), '.'),
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-8' },
+                    Object.entries(suggestions).map(([name, data]) => e(OptionCard, {
+                        key: name,
+                        title: name,
+                        description: Object.entries(data).map(([key, val]) => `${key}: ${val >= 0 ? '+' : ''}${val}`).join(', '),
+                        isSelected: JSON.stringify(character.attributes) === JSON.stringify(data),
+                        onSelect: () => onSelect('attributes', data)
+                    }))
+                ),
+                e('div', { className: 'text-center' },
+                    e('button', { onClick: handleNext, className: 'px-8 py-3 bg-cyan-500 text-slate-900 font-bold rounded-md hover:bg-cyan-400 transition' }, 'Confirm Attributes')
+                )
+            );
+        };
+
+        const CareerStep = ({ onSelect, nextStep, character }) => {
+            const suggestions = ARCHETYPES[character.archetype].careerSuggestions;
+            const handleNext = () => {
+                if (Object.keys(character.careers).length === 4 && Object.values(character.careers).reduce((a, b) => a + b, 0) === 4) {
+                    nextStep();
+                } else {
+                    alert("You must choose 4 careers and spend exactly 4 points.");
+                }
+            };
+            return e(StepContainer, { title: "Step 3: Select Careers" },
+                e('p', { className: 'mb-6 text-slate-300' }, 'Choose 4 starting careers and allocate 4 points among them. No career can be higher than +2. A rank of 0 means basic familiarity.'),
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-8' },
+                    Object.entries(suggestions).map(([name, data]) => e(OptionCard, {
+                        key: name,
+                        title: name,
+                        description: Object.entries(data).map(([key, val]) => `${key} ${val >= 0 ? '+' : ''}${val}`).join(', '),
+                        isSelected: JSON.stringify(character.careers) === JSON.stringify(data),
+                        onSelect: () => onSelect('careers', data)
+                    }))
+                ),
+                e('div', { className: 'text-center' },
+                    e('button', { onClick: handleNext, disabled: Object.keys(character.careers).length === 0, className: 'px-8 py-3 bg-cyan-500 text-slate-900 font-bold rounded-md hover:bg-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed' }, 'Confirm Careers')
+                )
+            );
+        };
+        
+        const CombatStep = ({ onSelect, nextStep, character }) => {
+            const suggestions = COMBAT_SUGGESTIONS[character.archetype];
+            const handleNext = () => {
+                if (Object.values(character.combatStats).reduce((a, b) => a + b, 0) === 4) {
+                    nextStep();
+                } else {
+                    alert("You must spend exactly 4 points.");
+                }
+            };
+            return e(StepContainer, { title: "Step 4: Assign Combat Stats" },
+                 e('p', { className: 'mb-6 text-slate-300' }, 'Allocate 4 points into your combat stats: Melee (ML), Ranged (RG), Defence (DF), and Initiative (IN).'),
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-8' },
+                    Object.entries(suggestions).map(([name, data]) => e(OptionCard, {
+                        key: name,
+                        title: name,
+                        description: Object.entries(data).map(([key, val]) => `${key}: +${val}`).join(', '),
+                        isSelected: JSON.stringify(character.combatStats) === JSON.stringify(data),
+                        onSelect: () => onSelect('combatStats', data)
+                    }))
+                ),
+                e('div', { className: 'text-center' },
+                    e('button', { onClick: handleNext, disabled: Object.values(character.combatStats).reduce((a, b) => a + b, 0) !== 4, className: 'px-8 py-3 bg-cyan-500 text-slate-900 font-bold rounded-md hover:bg-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed' }, 'Confirm Combat Stats')
+                )
+            );
+        };
+        
+        const TagStep = ({ onSelect, nextStep, character }) => {
+            const [selectedPositive, setSelectedPositive] = useState(character.positiveTags);
+            const [selectedNegative, setSelectedNegative] = useState(character.negativeTags);
+
+            const handleTogglePositive = (tag) => {
+                const isSelected = selectedPositive.includes(tag);
+                let newPositive = [...selectedPositive];
+                if (isSelected) {
+                    newPositive = newPositive.filter(t => t !== tag);
+                } else if (newPositive.length < 3) {
+                    newPositive.push(tag);
+                }
+                setSelectedPositive(newPositive);
+            };
+
+            const handleToggleNegative = (tag) => {
+                const isSelected = selectedNegative.includes(tag);
+                let newNegative = [...selectedNegative];
+                if (isSelected) {
+                    newNegative = newNegative.filter(t => t !== tag);
+                } else {
+                    newNegative.push(tag);
+                }
+                setSelectedNegative(newNegative);
+            };
+
+            const handleNext = () => {
+                onSelect('positiveTags', selectedPositive);
+                onSelect('negativeTags', selectedNegative);
+                nextStep();
+            };
+
+            const requiredNegatives = Math.max(0, selectedPositive.length - 1);
+            const isReady = selectedNegative.length === requiredNegatives && selectedPositive.length > 0;
+
+            return e(StepContainer, { title: "Step 5: Select Tags" },
+                e('p', { className: 'mb-6 text-slate-300' }, 'You start with one free Positive Tag. For each additional Positive Tag (up to 2 more), you must take one Negative Tag.'),
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-8' },
+                    e('div', {},
+                        e('h3', { className: 'text-2xl font-bold text-cyan-300 mb-4' }, `Positive Tags (${selectedPositive.length}/3)`),
+                        e('div', { className: 'space-y-3 max-h-96 overflow-y-auto pr-2' },
+                            Object.entries(POSITIVE_TAGS).map(([name, desc]) => e(OptionCard, { key: name, title: name, description: desc, isSelected: selectedPositive.includes(name), onSelect: () => handleTogglePositive(name) }))
+                        )
+                    ),
+                    e('div', {},
+                        e('h3', { className: 'text-2xl font-bold text-red-400 mb-4' }, `Negative Tags (${selectedNegative.length}/${requiredNegatives})`),
+                        e('div', { className: 'space-y-3 max-h-96 overflow-y-auto pr-2' },
+                            Object.entries(NEGATIVE_TAGS).map(([name, desc]) => e(OptionCard, { key: name, title: name, description: desc, isSelected: selectedNegative.includes(name), onSelect: () => handleToggleNegative(name) }))
+                        )
+                    )
+                ),
+                e('div', { className: 'text-center mt-8' },
+                    e('button', { onClick: handleNext, disabled: !isReady, className: 'px-8 py-3 bg-cyan-500 text-slate-900 font-bold rounded-md hover:bg-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed' }, 'Confirm Tags')
+                )
+            );
+        };
+        
+        const ObligationStep = ({ onSelect, nextStep, character }) => {
+            return e(StepContainer, { title: "Step 6: Choose Your Obligation" },
+                e('p', { className: 'mb-6 text-slate-300' }, 'Every character has a past that haunts them. This complication drives your personal story. Choose the burden you carry.'),
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8' },
+                    Object.entries(OBLIGATIONS).map(([name, data]) => e(OptionCard, {
+                        key: name,
+                        title: name,
+                        description: data,
+                        isSelected: character.obligation === name,
+                        onSelect: () => onSelect('obligation', name)
+                    }))
+                ),
+                e('div', { className: 'text-center' },
+                    e('button', { onClick: nextStep, disabled: !character.obligation, className: 'px-8 py-3 bg-cyan-500 text-slate-900 font-bold rounded-md hover:bg-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed' }, 'Finalize Character')
+                )
+            );
+        };
+
+        const CharacterSheet = ({ character, restart }) => {
+            const StatDisplay = ({ label, value }) => e('div', { className: "bg-slate-800 p-3 rounded-md text-center transition-transform hover:scale-105" },
+                e('div', { className: "text-cyan-300 uppercase text-xs tracking-widest" }, label),
+                e('div', { className: "text-2xl font-bold" }, `${value >= 0 ? '+' : ''}${value}`)
+            );
+            
+            const hp = 4 * (9 + character.attributes.SOM);
+            const load = 9 + character.attributes.SOM;
+
+            return e(StepContainer, { title: "Character Profile" },
+                e('div', { className: "bg-slate-800/50 p-6 rounded-lg border border-slate-700" },
+                    e('div', { className: "text-center mb-6" },
+                        e('h3', { className: "text-4xl font-bold text-white" }, character.name),
+                        e('p', { className: "text-cyan-400 text-xl" }, character.archetype)
+                    ),
+                    e('p', { className: "text-center italic text-slate-300 mb-8 max-w-2xl mx-auto" }, character.background),
+                    e('div', { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" }, Object.entries(character.attributes).map(([key, val]) => e(StatDisplay, { key, label: key, value: val }))),
+                    e('div', { className: "grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 bg-slate-900/50 p-4 rounded-md border border-slate-700" },
+                         e(StatDisplay, {label: "HP", value: hp}),
+                         e(StatDisplay, {label: "Load", value: load}),
+                         e('div', { className: "bg-slate-800 p-3 rounded-md text-center col-span-2 md:col-span-1" },
+                             e('div', { className: "text-cyan-300 uppercase text-xs tracking-widest" }, 'Base TN'),
+                             e('div', { className: "text-2xl font-bold" }, 9)
+                         )
+                    ),
+                    e('div', { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" }, Object.entries(character.combatStats).map(([key, val]) => e(StatDisplay, { key, label: key, value: val }))),
+                    e('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-8 mb-8" },
+                        e('div', {},
+                            e('h4', { className: "text-xl font-bold text-cyan-300 mb-3 border-b-2 border-cyan-300/20 pb-2" }, 'Careers'),
+                            e('ul', { className: "space-y-1 list-disc list-inside text-slate-200" }, Object.entries(character.careers).map(([key, val]) => e('li', { key }, `${key} `, e('span', { className: 'font-bold' }, `${val >= 0 ? '+' : ''}${val}`))))
+                        ),
+                        e('div', {},
+                            e('h4', { className: "text-xl font-bold text-cyan-300 mb-3 border-b-2 border-cyan-300/20 pb-2" }, 'Obligation'),
+                            e('p', { className: "text-slate-200" }, e('span', { className: 'font-bold text-white' }, `${character.obligation}: `), OBLIGATIONS[character.obligation])
+                        )
+                    ),
+                     e('div', {},
+                        e('h4', { className: "text-xl font-bold text-cyan-300 mb-3 border-b-2 border-cyan-300/20 pb-2" }, 'Tags'),
+                        e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4'},
+                            e('div', {},
+                                e('h5', {className: 'text-lg font-semibold text-white'}, 'Positive'),
+                                e('ul', { className: "space-y-1 list-disc list-inside text-slate-200" }, character.positiveTags.map(tag => e('li', {key: tag}, tag)))
+                            ),
+                             e('div', {},
+                                e('h5', {className: 'text-lg font-semibold text-red-400'}, 'Negative'),
+                                e('ul', { className: "space-y-1 list-disc list-inside text-slate-200" }, character.negativeTags.map(tag => e('li', {key: tag}, tag)))
+                            )
+                        )
+                     )
+                ),
+                e('div', { className: "text-center mt-8" },
+                    e('button', { onClick: restart, className: "px-8 py-3 bg-red-500 text-white font-bold rounded-md hover:bg-red-400 transition" }, "Create Another Character")
+                )
+            );
+        };
+        
+        // --- MAIN APP COMPONENT ---
+
+        const App = () => {
+            const [step, setStep] = useState(0);
+            const [character, setCharacter] = useState({ name: "Character", archetype: null, attributes: { SOM: 0, DEX: 0, COG: 0, PRE: 0 }, careers: {}, combatStats: { ML: 0, RG: 0, DF: 0, IN: 0 }, positiveTags: [], negativeTags: [], obligation: null, background: "" });
+            
+            const handleSelect = (key, value) => { setCharacter(prev => ({ ...prev, [key]: value })); };
+            const nextStep = () => setStep(prev => prev + 1);
+            const prevStep = () => setStep(prev => prev > 0 ? prev - 1 : 0);
+            const restart = () => {
+                setStep(0);
+                setCharacter({ name: "Character", archetype: null, attributes: { SOM: 0, DEX: 0, COG: 0, PRE: 0 }, careers: {}, combatStats: { ML: 0, RG: 0, DF: 0, IN: 0 }, positiveTags: [], negativeTags: [], obligation: null, background: "" });
+            };
+
+            const generateCharacterDetails = useCallback(() => {
+                if (character.archetype) {
+                    const name = NAMES[character.archetype][Math.floor(Math.random() * NAMES[character.archetype].length)];
+                    const tempChar = { ...character, name };
+                    const background = BACKGROUND_TEMPLATES[character.archetype](tempChar);
+                    setCharacter(prev => ({ ...prev, name, background }));
+                }
+            }, [character.archetype, character.name]);
+
+            useEffect(() => {
+                if (step === 6 && !character.background) {
+                    generateCharacterDetails();
+                }
+            }, [step, character.background, generateCharacterDetails]);
+
+            const renderStep = () => {
+                switch (step) {
+                    case 0: return e(ArchetypeStep, { onSelect: handleSelect, nextStep, character });
+                    case 1: return e(AttributeStep, { onSelect: handleSelect, nextStep, character });
+                    case 2: return e(CareerStep, { onSelect: handleSelect, nextStep, character });
+                    case 3: return e(CombatStep, { onSelect: handleSelect, nextStep, character });
+                    case 4: return e(TagStep, { onSelect: handleSelect, nextStep, character });
+                    case 5: return e(ObligationStep, { onSelect: handleSelect, nextStep, character });
+                    case 6: return e(CharacterSheet, { character, restart });
+                    default: return e('div', {}, 'Unknown Step');
+                }
+            };
+
+            return e('main', { className: 'bg-slate-900 text-white min-h-screen font-sans flex flex-col items-center justify-center p-4' },
+                e('div', { className: 'w-full max-w-5xl bg-slate-800/50 rounded-lg shadow-2xl backdrop-blur-sm border border-slate-700 overflow-hidden' },
+                    e('header', { className: 'p-4 bg-slate-900/70 border-b border-slate-700' },
+                        e('h1', { className: 'text-2xl font-bold text-center tracking-widest text-white' }, 'GHOST DISSONANCE'),
+                        e('p', { className: 'text-center text-cyan-400' }, 'CHARACTER CREATOR')
+                    ),
+                    e('div', { className: 'p-2' }, renderStep()),
+                    step < 6 && e('footer', { className: 'p-4 bg-slate-900/70 border-t border-slate-700 flex justify-between items-center' },
+                        e('button', { onClick: prevStep, disabled: step === 0, className: 'px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-600 transition disabled:opacity-50 disabled:cursor-not-allowed' }, 'Back'),
+                        e('div', { className: 'text-sm text-slate-400' }, `STEP ${step + 1} / 7`)
+                    )
+                )
+            );
+        };
+
+        // --- RENDER THE APP ---
+        ReactDOM.render(e(App), document.getElementById('root'));
+
+    </script>
+</body>
+</html>
