@@ -322,7 +322,7 @@
                 e('div', { className: "text-2xl font-bold" }, `${value >= 0 ? '+' : ''}${value}`)
             );
             
-            const hp = 4 * (9 + character.attributes.SOM);
+            const hp = 4 + character.attributes.SOM;
             const load = 9 + character.attributes.SOM;
 
             return e(StepContainer, { title: "Character Profile" },
